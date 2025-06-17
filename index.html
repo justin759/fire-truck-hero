@@ -35,6 +35,31 @@
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
+        /* FIX: Start Screen styling */
+        #start-screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        #start-button {
+            padding: 20px 40px;
+            font-size: 48px;
+            font-weight: bold;
+            color: white;
+            background-color: #4CAF50;
+            border: 5px solid white;
+            border-radius: 15px;
+            cursor: pointer;
+            text-shadow: 2px 2px 4px #000;
+        }
+        #start-button:hover {
+            background-color: #45a049;
+        }
         #touch-controls {
             position: absolute;
             bottom: 20px;
@@ -95,6 +120,10 @@
 </head>
 <body>
     <div id="game-container">
+        <!-- FIX: Added Start Screen HTML -->
+        <div id="start-screen">
+            <button id="start-button">Start Game</button>
+        </div>
         <canvas id="gameCanvas"></canvas>
         <div id="touch-controls">
             <div class="d-pad">
@@ -120,7 +149,7 @@
         ctx.imageSmoothingEnabled = false;
 
         // --- GAME STATE & CONSTANTS ---
-        let gameState = 'LOADING';
+        let gameState = 'START_SCREEN'; // New initial state
         let score = 0;
         const WIN_SCORE = 10;
         const NUM_HOUSES = 4;
@@ -146,10 +175,9 @@
             ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, ' ': false
         };
 
-        // --- NEW ASSET LOADING ---
+        // --- ASSET LOADING ---
         let assetsToLoad = 0;
         let assetsLoaded = 0;
-        let isAudioInitialized = false;
 
         // Create asset objects
         const backgroundImage = new Image();
@@ -165,7 +193,8 @@
         function assetLoaded() {
             assetsLoaded++;
             if (assetsLoaded === assetsToLoad) {
-                startGame();
+                // This is now called when loading is complete
+                resetGame();
             }
         }
 
@@ -176,39 +205,15 @@
                 asset.addEventListener('canplaythrough', assetLoaded, { once: true });
                 asset.addEventListener('error', () => {
                     console.error("Error loading audio: " + src);
-                    assetLoaded(); // Still count it as "loaded" to not block game start
+                    assetLoaded();
                 });
             } else {
                 asset.onload = assetLoaded;
                 asset.onerror = () => {
                     console.error("Error loading image: " + src);
-                    assetLoaded(); // Still count it as "loaded"
+                    assetLoaded();
                 };
             }
-        }
-
-        // Prepare all assets for loading
-        prepareAsset(backgroundImage, 'Dessert_background.png');
-        prepareAsset(houseImage, 'blue_house.png');
-        prepareAsset(fireImage, 'fire.png');
-        prepareAsset(truckUpImage, 'fire_truck_up.png');
-        prepareAsset(truckDownImage, 'fire_truck_down.png');
-        prepareAsset(truckLeftImage, 'fire_truck_left.png');
-        prepareAsset(truckRightImage, 'fire_truck_right.png');
-        
-        bgm.loop = true;
-        bgm.volume = BGM_VOLUME;
-        prepareAsset(bgm, 'bgm.mp3', true);
-        
-        shootSound.loop = true;
-        shootSound.volume = SHOOT_SOUND_VOLUME;
-        prepareAsset(shootSound, 'shoot.mp3', true);
-        
-        // --- AUDIO INITIALIZATION ---
-        function initAudioOnInteraction() {
-            if (isAudioInitialized) return;
-            bgm.play().catch(e => {});
-            isAudioInitialized = true;
         }
 
         // --- GAME OBJECTS & HELPERS ---
@@ -314,6 +319,7 @@
                         waterParticles.splice(i, 1);
                         if (score >= WIN_SCORE) {
                             gameState = 'WIN';
+                            if (!bgm.paused) bgm.pause();
                             clearTimeout(fireTimer);
                             if (!shootSound.paused) shootSound.pause();
                         } else {
@@ -327,6 +333,12 @@
 
         function draw() {
             ctx.clearRect(0, 0, NATIVE_WIDTH, NATIVE_HEIGHT);
+            
+            if (gameState === 'START_SCREEN') {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, NATIVE_WIDTH, NATIVE_HEIGHT);
+                return; // The HTML button is visible, so we just draw a black background
+            }
             
             if (gameState === 'LOADING') {
                  ctx.fillStyle = '#000';
@@ -397,13 +409,11 @@
         
         // --- EVENT LISTENERS ---
         window.addEventListener('keydown', (e) => {
-            initAudioOnInteraction();
             if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
         });
         window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
 
         canvas.addEventListener('click', (e) => {
-            initAudioOnInteraction();
             if (gameState !== 'WIN') return;
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
@@ -425,7 +435,6 @@
             const shootBtn = document.getElementById('shoot');
 
             function handleTouch(e, key, isPressed) {
-                initAudioOnInteraction();
                 e.preventDefault();
                 keys[key] = isPressed;
             }
@@ -472,22 +481,47 @@
             clearTimeout(fireTimer);
             fireTimer = setTimeout(startNewFire, 3000);
             gameState = 'PLAYING';
+            bgm.play().catch(e => {});
         }
 
-        function startGame() {
-            resetGame();
+        // FIX: New Start Button Logic
+        const startScreen = document.getElementById('start-screen');
+        const startButton = document.getElementById('start-button');
+        
+        startButton.addEventListener('click', () => {
+            startScreen.style.display = 'none';
+            gameState = 'LOADING';
+
+            // Unlock audio context for iOS
+            bgm.play().catch(()=>{});
+            bgm.pause();
+            shootSound.play().catch(()=>{});
+            shootSound.pause();
+
+            // Now that user has interacted, we can load all assets
+            prepareAsset(backgroundImage, 'Dessert_background.png');
+            prepareAsset(houseImage, 'blue_house.png');
+            prepareAsset(fireImage, 'fire.png');
+            prepareAsset(truckUpImage, 'fire_truck_up.png');
+            prepareAsset(truckDownImage, 'fire_truck_down.png');
+            prepareAsset(truckLeftImage, 'fire_truck_left.png');
+            prepareAsset(truckRightImage, 'fire_truck_right.png');
+            
+            bgm.loop = true;
+            bgm.volume = BGM_VOLUME;
+            prepareAsset(bgm, 'bgm.mp3', true);
+            
+            shootSound.loop = true;
+            shootSound.volume = SHOOT_SOUND_VOLUME;
+            prepareAsset(shootSound, 'shoot.mp3', true);
+
+            // Start the game loop to show the loading screen
             gameLoop();
-        }
-
-        function loadingLoop() {
-            draw();
-            if (gameState === 'LOADING') {
-                requestAnimationFrame(loadingLoop);
-            }
-        }
+        }, { once: true });
         
         setupTouchControls();
-        loadingLoop();
+        // Initial draw for the black background behind the start button
+        draw();
 
     </script>
 </body>

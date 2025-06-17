@@ -35,7 +35,6 @@
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
-        /* FIX: Start Screen styling */
         #start-screen {
             position: absolute;
             width: 100%;
@@ -120,7 +119,6 @@
 </head>
 <body>
     <div id="game-container">
-        <!-- FIX: Added Start Screen HTML -->
         <div id="start-screen">
             <button id="start-button">Start Game</button>
         </div>
@@ -149,7 +147,7 @@
         ctx.imageSmoothingEnabled = false;
 
         // --- GAME STATE & CONSTANTS ---
-        let gameState = 'START_SCREEN'; // New initial state
+        let gameState = 'START_SCREEN';
         let score = 0;
         const WIN_SCORE = 10;
         const NUM_HOUSES = 4;
@@ -160,6 +158,12 @@
 
         const BGM_VOLUME = 0.3;
         const SHOOT_SOUND_VOLUME = 0.7;
+
+        // --- NEW: Water effect constants ported from the other game ---
+        const WATER_PARTICLE_SPEED = 20;
+        const WATER_PARTICLE_SIZE = 10;
+        const PARTICLES_PER_FRAME_WHILE_SHOOTING = 12; // Adjusted for balance
+        const SHOT_SPREAD = 40; // How wide the water spray is
 
         const player = {
             width: PLAYER_BASE_SIZE * TRUCK_SCALE_FACTOR,
@@ -179,7 +183,6 @@
         let assetsToLoad = 0;
         let assetsLoaded = 0;
 
-        // Create asset objects
         const backgroundImage = new Image();
         const houseImage = new Image();
         const fireImage = new Image();
@@ -193,7 +196,6 @@
         function assetLoaded() {
             assetsLoaded++;
             if (assetsLoaded === assetsToLoad) {
-                // This is now called when loading is complete
                 resetGame();
             }
         }
@@ -203,19 +205,13 @@
             asset.src = src;
             if (isAudio) {
                 asset.addEventListener('canplaythrough', assetLoaded, { once: true });
-                asset.addEventListener('error', () => {
-                    console.error("Error loading audio: " + src);
-                    assetLoaded();
-                });
+                asset.addEventListener('error', () => { console.error("Error loading audio: " + src); assetLoaded(); });
             } else {
                 asset.onload = assetLoaded;
-                asset.onerror = () => {
-                    console.error("Error loading image: " + src);
-                    assetLoaded();
-                };
+                asset.onerror = () => { console.error("Error loading image: " + src); assetLoaded(); };
             }
         }
-
+        
         // --- GAME OBJECTS & HELPERS ---
         function checkCollision(rect1, rect2) {
             return rect1.x < rect2.x + rect2.width &&
@@ -262,6 +258,55 @@
             }
         }
 
+        // --- NEW: shootWater function with ported effects ---
+        function shootWater() {
+            let nozzleX, nozzleY;
+
+            // Determine nozzle position based on truck direction
+            switch(player.direction) {
+                case 'up':
+                    nozzleX = player.x + player.width / 2;
+                    nozzleY = player.y;
+                    break;
+                case 'down':
+                    nozzleX = player.x + player.width / 2;
+                    nozzleY = player.y + player.height;
+                    break;
+                case 'left':
+                    nozzleX = player.x;
+                    nozzleY = player.y + player.height / 2;
+                    break;
+                case 'right':
+                    nozzleX = player.x + player.width;
+                    nozzleY = player.y + player.height / 2;
+                    break;
+            }
+
+            for (let i = 0; i < PARTICLES_PER_FRAME_WHILE_SHOOTING; i++) {
+                let pX = nozzleX;
+                let pY = nozzleY;
+
+                // Apply spread based on direction
+                if (player.direction === 'up' || player.direction === 'down') {
+                    // Shooting vertically, spread horizontally
+                    pX += (Math.random() - 0.5) * SHOT_SPREAD;
+                } else {
+                    // Shooting horizontally, spread vertically
+                    pY += (Math.random() - 0.5) * SHOT_SPREAD;
+                }
+
+                waterParticles.push({
+                    x: pX,
+                    y: pY,
+                    width: WATER_PARTICLE_SIZE,
+                    height: WATER_PARTICLE_SIZE,
+                    speed: WATER_PARTICLE_SPEED,
+                    life: 40, // How long particles last
+                    direction: player.direction
+                });
+            }
+        }
+
         // --- GAME LOGIC (UPDATE & DRAW) ---
         function update() {
             if (gameState !== 'PLAYING') return;
@@ -293,27 +338,34 @@
             }
 
             if (keys[' ']) {
+                shootWater(); // Use the new function
                 if (shootSound.paused) { shootSound.play().catch(e => {}); }
-                waterParticles.push({ x: player.x + player.width / 2, y: player.y + player.height / 2, size: 8, speed: 10, life: 40, direction: player.direction });
             } else {
                 if (!shootSound.paused) { shootSound.pause(); shootSound.currentTime = 0; }
             }
 
+            // Update water particles based on their individual properties
             for (let i = waterParticles.length - 1; i >= 0; i--) {
                 const p = waterParticles[i];
                 p.life--;
-                if (p.direction === 'up') p.y -= p.speed;
-                else if (p.direction === 'down') p.y += p.speed;
-                else if (p.direction === 'left') p.x -= p.speed;
-                else if (p.direction === 'right') p.x += p.speed;
-                if (p.life <= 0) waterParticles.splice(i, 1);
+
+                switch(p.direction) {
+                    case 'up': p.y -= p.speed; break;
+                    case 'down': p.y += p.speed; break;
+                    case 'left': p.x -= p.speed; break;
+                    case 'right': p.x += p.speed; break;
+                }
+
+                if (p.life <= 0) {
+                    waterParticles.splice(i, 1);
+                }
             }
             
             const burningHouse = houses.find(h => h.isOnFire);
             if (burningHouse) {
                 for (let i = waterParticles.length - 1; i >= 0; i--) {
                     const p = waterParticles[i];
-                    if (checkCollision({ x: p.x, y: p.y, width: p.size, height: p.size }, burningHouse)) {
+                    if (checkCollision({ x: p.x, y: p.y, width: p.width, height: p.height }, burningHouse)) {
                         burningHouse.isOnFire = false;
                         score++;
                         waterParticles.splice(i, 1);
@@ -337,7 +389,7 @@
             if (gameState === 'START_SCREEN') {
                 ctx.fillStyle = '#000';
                 ctx.fillRect(0, 0, NATIVE_WIDTH, NATIVE_HEIGHT);
-                return; // The HTML button is visible, so we just draw a black background
+                return;
             }
             
             if (gameState === 'LOADING') {
@@ -369,9 +421,10 @@
             }
             ctx.drawImage(truckImage, player.x, player.y, player.width, player.height);
             
-            ctx.fillStyle = 'cyan';
+            // Draw water particles
+            ctx.fillStyle = 'rgb(0,200,200)';
             for (const p of waterParticles) {
-                ctx.fillRect(p.x, p.y, p.size, p.size);
+                ctx.fillRect(p.x, p.y, p.width, p.height);
             }
 
             ctx.fillStyle = 'white';
@@ -484,7 +537,6 @@
             bgm.play().catch(e => {});
         }
 
-        // FIX: New Start Button Logic
         const startScreen = document.getElementById('start-screen');
         const startButton = document.getElementById('start-button');
         
@@ -492,13 +544,11 @@
             startScreen.style.display = 'none';
             gameState = 'LOADING';
 
-            // Unlock audio context for iOS
             bgm.play().catch(()=>{});
             bgm.pause();
             shootSound.play().catch(()=>{});
             shootSound.pause();
 
-            // Now that user has interacted, we can load all assets
             prepareAsset(backgroundImage, 'Dessert_background.png');
             prepareAsset(houseImage, 'blue_house.png');
             prepareAsset(fireImage, 'fire.png');
@@ -515,12 +565,10 @@
             shootSound.volume = SHOOT_SOUND_VOLUME;
             prepareAsset(shootSound, 'shoot.mp3', true);
 
-            // Start the game loop to show the loading screen
             gameLoop();
         }, { once: true });
         
         setupTouchControls();
-        // Initial draw for the black background behind the start button
         draw();
 
     </script>

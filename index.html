@@ -135,10 +135,7 @@
         const player = {
             width: PLAYER_BASE_SIZE * TRUCK_SCALE_FACTOR,
             height: PLAYER_BASE_SIZE * TRUCK_SCALE_FACTOR,
-            x: 0,
-            y: 0,
-            speed: 5,
-            direction: 'right',
+            x: 0, y: 0, speed: 5, direction: 'right',
         };
 
         const houses = [];
@@ -146,71 +143,71 @@
         let fireTimer = null;
 
         const keys = {
-            ArrowUp: false,
-            ArrowDown: false,
-            ArrowLeft: false,
-            ArrowRight: false,
-            ' ': false
+            ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, ' ': false
         };
 
-        // --- ASSET LOADING ---
-        const imageSources = {
-            background: 'Dessert_background.png',
-            house: 'blue_house.png',
-            fire: 'fire.png',
-            truckUp: 'fire_truck_up.png',
-            truckDown: 'fire_truck_down.png',
-            truckLeft: 'fire_truck_left.png',
-            truckRight: 'fire_truck_right.png'
-        };
-
-        const images = {};
+        // --- NEW ASSET LOADING ---
+        let assetsToLoad = 0;
         let assetsLoaded = 0;
-        const totalAssets = Object.keys(imageSources).length + 2;
-
         let isAudioInitialized = false;
+
+        // Create asset objects
+        const backgroundImage = new Image();
+        const houseImage = new Image();
+        const fireImage = new Image();
+        const truckUpImage = new Image();
+        const truckDownImage = new Image();
+        const truckLeftImage = new Image();
+        const truckRightImage = new Image();
+        const bgm = new Audio();
+        const shootSound = new Audio();
 
         function assetLoaded() {
             assetsLoaded++;
-            if (assetsLoaded === totalAssets) {
+            if (assetsLoaded === assetsToLoad) {
                 startGame();
             }
         }
 
-        for (const key in imageSources) {
-            images[key] = new Image();
-            images[key].src = imageSources[key];
-            images[key].onload = assetLoaded;
-            images[key].onerror = () => {
-                console.error(`Failed to load image: ${imageSources[key]}`);
-                assetLoaded(); // Still count it as "loaded" to not block the game
-            };
+        function prepareAsset(asset, src, isAudio = false) {
+            assetsToLoad++;
+            asset.src = src;
+            if (isAudio) {
+                asset.addEventListener('canplaythrough', assetLoaded, { once: true });
+                asset.addEventListener('error', () => {
+                    console.error("Error loading audio: " + src);
+                    assetLoaded(); // Still count it as "loaded" to not block game start
+                });
+            } else {
+                asset.onload = assetLoaded;
+                asset.onerror = () => {
+                    console.error("Error loading image: " + src);
+                    assetLoaded(); // Still count it as "loaded"
+                };
+            }
         }
 
-        const bgm = new Audio('bgm.mp3');
+        // Prepare all assets for loading
+        prepareAsset(backgroundImage, 'Dessert_background.png');
+        prepareAsset(houseImage, 'blue_house.png');
+        prepareAsset(fireImage, 'fire.png');
+        prepareAsset(truckUpImage, 'fire_truck_up.png');
+        prepareAsset(truckDownImage, 'fire_truck_down.png');
+        prepareAsset(truckLeftImage, 'fire_truck_left.png');
+        prepareAsset(truckRightImage, 'fire_truck_right.png');
+        
         bgm.loop = true;
         bgm.volume = BGM_VOLUME;
-        bgm.addEventListener('canplaythrough', assetLoaded, { once: true });
-        // FIX: Added error handling for audio files
-        bgm.addEventListener('error', () => {
-            console.error("Failed to load bgm.mp3. The game will continue without it.");
-            assetLoaded(); // CRITICAL: Increment counter even on failure.
-        }, { once: true });
-
-        const shootSound = new Audio('shoot.mp3');
+        prepareAsset(bgm, 'bgm.mp3', true);
+        
         shootSound.loop = true;
         shootSound.volume = SHOOT_SOUND_VOLUME;
-        shootSound.addEventListener('canplaythrough', assetLoaded, { once: true });
-        // FIX: Added error handling for audio files
-        shootSound.addEventListener('error', () => {
-            console.error("Failed to load shoot.mp3. The game will continue without it.");
-            assetLoaded(); // CRITICAL: Increment counter even on failure.
-        }, { once: true });
-
+        prepareAsset(shootSound, 'shoot.mp3', true);
+        
         // --- AUDIO INITIALIZATION ---
         function initAudioOnInteraction() {
             if (isAudioInitialized) return;
-            bgm.play().catch(e => {}); // Catch potential errors if audio context isn't ready
+            bgm.play().catch(e => {});
             isAudioInitialized = true;
         }
 
@@ -229,13 +226,11 @@
         function createHouses() {
             houses.length = 0;
             while (houses.length < NUM_HOUSES) {
-                const houseWidth = images.house.width;
-                const houseHeight = images.house.height;
                 const newHouse = {
-                    width: houseWidth,
-                    height: houseHeight,
-                    x: getRandomInt(HOUSE_MARGIN, NATIVE_WIDTH - houseWidth - HOUSE_MARGIN),
-                    y: getRandomInt(HOUSE_MARGIN, NATIVE_HEIGHT - houseHeight - HOUSE_MARGIN),
+                    width: houseImage.width,
+                    height: houseImage.height,
+                    x: getRandomInt(HOUSE_MARGIN, NATIVE_WIDTH - houseImage.width - HOUSE_MARGIN),
+                    y: getRandomInt(HOUSE_MARGIN, NATIVE_HEIGHT - houseImage.height - HOUSE_MARGIN),
                     isOnFire: false
                 };
                 let hasOverlap = false;
@@ -339,26 +334,26 @@
                  ctx.fillStyle = 'white';
                  ctx.font = '60px Arial';
                  ctx.textAlign = 'center';
-                 ctx.fillText(`Loading... ${assetsLoaded}/${totalAssets}`, NATIVE_WIDTH / 2, NATIVE_HEIGHT / 2);
+                 ctx.fillText(`Loading... ${assetsLoaded}/${assetsToLoad}`, NATIVE_WIDTH / 2, NATIVE_HEIGHT / 2);
                  ctx.textAlign = 'left';
                  return;
             }
 
-            ctx.drawImage(images.background, 0, 0, NATIVE_WIDTH, NATIVE_HEIGHT);
+            ctx.drawImage(backgroundImage, 0, 0, NATIVE_WIDTH, NATIVE_HEIGHT);
 
             for (const house of houses) {
-                ctx.drawImage(images.house, house.x, house.y);
+                ctx.drawImage(houseImage, house.x, house.y);
                 if (house.isOnFire) {
-                    ctx.drawImage(images.fire, house.x, house.y, house.width, house.height);
+                    ctx.drawImage(fireImage, house.x, house.y, house.width, house.height);
                 }
             }
 
             let truckImage;
             switch (player.direction) {
-                case 'up': truckImage = images.truckUp; break;
-                case 'down': truckImage = images.truckDown; break;
-                case 'left': truckImage = images.truckLeft; break;
-                case 'right': truckImage = images.truckRight; break;
+                case 'up': truckImage = truckUpImage; break;
+                case 'down': truckImage = truckDownImage; break;
+                case 'left': truckImage = truckLeftImage; break;
+                case 'right': truckImage = truckRightImage; break;
             }
             ctx.drawImage(truckImage, player.x, player.y, player.width, player.height);
             

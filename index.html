@@ -129,15 +129,14 @@
         const PLAYER_BASE_SIZE = 40;
         const TRUCK_SCALE_FACTOR = 4;
 
-        // FIX: Added volume control parameters
-        const BGM_VOLUME = 0.3; // Value from 0.0 to 1.0
-        const SHOOT_SOUND_VOLUME = 0.7; // Value from 0.0 to 1.0
+        const BGM_VOLUME = 0.3;
+        const SHOOT_SOUND_VOLUME = 0.7;
 
         const player = {
             width: PLAYER_BASE_SIZE * TRUCK_SCALE_FACTOR,
             height: PLAYER_BASE_SIZE * TRUCK_SCALE_FACTOR,
-            x: 0, // Will be set to a safe location
-            y: 0, // Will be set to a safe location
+            x: 0,
+            y: 0,
             speed: 5,
             direction: 'right',
         };
@@ -182,23 +181,36 @@
             images[key] = new Image();
             images[key].src = imageSources[key];
             images[key].onload = assetLoaded;
-            images[key].onerror = () => console.error(`Failed to load image: ${imageSources[key]}`);
+            images[key].onerror = () => {
+                console.error(`Failed to load image: ${imageSources[key]}`);
+                assetLoaded(); // Still count it as "loaded" to not block the game
+            };
         }
 
         const bgm = new Audio('bgm.mp3');
         bgm.loop = true;
-        bgm.volume = BGM_VOLUME; // Set BGM volume
+        bgm.volume = BGM_VOLUME;
         bgm.addEventListener('canplaythrough', assetLoaded, { once: true });
+        // FIX: Added error handling for audio files
+        bgm.addEventListener('error', () => {
+            console.error("Failed to load bgm.mp3. The game will continue without it.");
+            assetLoaded(); // CRITICAL: Increment counter even on failure.
+        }, { once: true });
 
         const shootSound = new Audio('shoot.mp3');
         shootSound.loop = true;
-        shootSound.volume = SHOOT_SOUND_VOLUME; // Set shooting sound volume
+        shootSound.volume = SHOOT_SOUND_VOLUME;
         shootSound.addEventListener('canplaythrough', assetLoaded, { once: true });
+        // FIX: Added error handling for audio files
+        shootSound.addEventListener('error', () => {
+            console.error("Failed to load shoot.mp3. The game will continue without it.");
+            assetLoaded(); // CRITICAL: Increment counter even on failure.
+        }, { once: true });
 
         // --- AUDIO INITIALIZATION ---
         function initAudioOnInteraction() {
             if (isAudioInitialized) return;
-            bgm.play().catch(e => console.error("BGM autoplay failed:", e));
+            bgm.play().catch(e => {}); // Catch potential errors if audio context isn't ready
             isAudioInitialized = true;
         }
 
@@ -226,7 +238,6 @@
                     y: getRandomInt(HOUSE_MARGIN, NATIVE_HEIGHT - houseHeight - HOUSE_MARGIN),
                     isOnFire: false
                 };
-
                 let hasOverlap = false;
                 for (const house of houses) {
                     if (checkCollision(
@@ -237,7 +248,6 @@
                         break;
                     }
                 }
-
                 if (!hasOverlap) {
                     houses.push(newHouse);
                 }
@@ -259,7 +269,6 @@
             let dx = 0;
             if (keys.ArrowLeft) { dx = -player.speed; player.direction = 'left'; }
             if (keys.ArrowRight) { dx = player.speed; player.direction = 'right'; }
-
             if (dx !== 0) {
                 const nextX = player.x + dx;
                 const playerRect = { x: nextX, y: player.y, width: player.width, height: player.height };
@@ -273,7 +282,6 @@
             let dy = 0;
             if (keys.ArrowUp) { dy = -player.speed; player.direction = 'up'; }
             if (keys.ArrowDown) { dy = player.speed; player.direction = 'down'; }
-            
             if (dy !== 0) {
                 const nextY = player.y + dy;
                 const playerRect = { x: player.x, y: nextY, width: player.width, height: player.height };
@@ -444,15 +452,13 @@
             score = 0;
             waterParticles.length = 0;
             
-            createHouses(); // Create houses first
+            createHouses();
 
-            // FIX: Find a safe, random spawn point for the player that doesn't collide with houses
             let safeSpawnFound = false;
             while (!safeSpawnFound) {
                 const potentialX = getRandomInt(0, NATIVE_WIDTH - player.width);
                 const potentialY = getRandomInt(0, NATIVE_HEIGHT - player.height);
                 const playerSpawnRect = { x: potentialX, y: potentialY, width: player.width, height: player.height };
-
                 let isColliding = false;
                 for (const house of houses) {
                     if (checkCollision(playerSpawnRect, house)) {
@@ -460,7 +466,6 @@
                         break;
                     }
                 }
-
                 if (!isColliding) {
                     player.x = potentialX;
                     player.y = potentialY;

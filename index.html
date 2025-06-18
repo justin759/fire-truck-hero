@@ -61,8 +61,7 @@
         }
         #touch-controls {
             position: absolute;
-            /* FIX: Changed from 20px to 5% for a responsive buffer */
-            bottom: 5%;
+            bottom: 20px;
             width: 100%;
             height: 150px;
             display: flex;
@@ -160,10 +159,11 @@
         const BGM_VOLUME = 0.3;
         const SHOOT_SOUND_VOLUME = 0.7;
 
+        // --- NEW: Water effect constants ported from the other game ---
         const WATER_PARTICLE_SPEED = 20;
         const WATER_PARTICLE_SIZE = 10;
-        const PARTICLES_PER_FRAME_WHILE_SHOOTING = 12;
-        const SHOT_SPREAD = 120;
+        const PARTICLES_PER_FRAME_WHILE_SHOOTING = 12; // Adjusted for balance
+        const SHOT_SPREAD = 40; // How wide the water spray is
 
         const player = {
             width: PLAYER_BASE_SIZE * TRUCK_SCALE_FACTOR,
@@ -258,8 +258,11 @@
             }
         }
 
+        // --- NEW: shootWater function with ported effects ---
         function shootWater() {
             let nozzleX, nozzleY;
+
+            // Determine nozzle position based on truck direction
             switch(player.direction) {
                 case 'up':
                     nozzleX = player.x + player.width / 2;
@@ -282,15 +285,23 @@
             for (let i = 0; i < PARTICLES_PER_FRAME_WHILE_SHOOTING; i++) {
                 let pX = nozzleX;
                 let pY = nozzleY;
+
+                // Apply spread based on direction
                 if (player.direction === 'up' || player.direction === 'down') {
+                    // Shooting vertically, spread horizontally
                     pX += (Math.random() - 0.5) * SHOT_SPREAD;
                 } else {
+                    // Shooting horizontally, spread vertically
                     pY += (Math.random() - 0.5) * SHOT_SPREAD;
                 }
+
                 waterParticles.push({
-                    x: pX, y: pY,
-                    width: WATER_PARTICLE_SIZE, height: WATER_PARTICLE_SIZE,
-                    speed: WATER_PARTICLE_SPEED, life: 40,
+                    x: pX,
+                    y: pY,
+                    width: WATER_PARTICLE_SIZE,
+                    height: WATER_PARTICLE_SIZE,
+                    speed: WATER_PARTICLE_SPEED,
+                    life: 40, // How long particles last
                     direction: player.direction
                 });
             }
@@ -327,21 +338,24 @@
             }
 
             if (keys[' ']) {
-                shootWater();
+                shootWater(); // Use the new function
                 if (shootSound.paused) { shootSound.play().catch(e => {}); }
             } else {
                 if (!shootSound.paused) { shootSound.pause(); shootSound.currentTime = 0; }
             }
 
+            // Update water particles based on their individual properties
             for (let i = waterParticles.length - 1; i >= 0; i--) {
                 const p = waterParticles[i];
                 p.life--;
+
                 switch(p.direction) {
                     case 'up': p.y -= p.speed; break;
                     case 'down': p.y += p.speed; break;
                     case 'left': p.x -= p.speed; break;
                     case 'right': p.x += p.speed; break;
                 }
+
                 if (p.life <= 0) {
                     waterParticles.splice(i, 1);
                 }
@@ -407,6 +421,7 @@
             }
             ctx.drawImage(truckImage, player.x, player.y, player.width, player.height);
             
+            // Draw water particles
             ctx.fillStyle = 'rgb(0,200,200)';
             for (const p of waterParticles) {
                 ctx.fillRect(p.x, p.y, p.width, p.height);

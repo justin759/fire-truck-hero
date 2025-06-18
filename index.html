@@ -59,43 +59,45 @@
         #start-button:hover {
             background-color: #45a049;
         }
+        
+        /* --- START OF TOUCH CONTROL FIXES --- */
         #touch-controls {
             position: absolute;
             bottom: 20px;
             width: 100%;
-            height: 150px;
+            height: 225px; /* 150px * 1.5 */
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 30px;
+            padding: 0 40px; /* Increased padding */
             box-sizing: border-box;
             z-index: 10;
         }
         .d-pad {
             position: relative;
-            width: 150px;
-            height: 150px;
+            width: 225px;  /* 150px * 1.5 */
+            height: 225px; /* 150px * 1.5 */
         }
         .shoot-button {
-            width: 120px;
-            height: 120px;
+            width: 180px;  /* 120px * 1.5 */
+            height: 180px; /* 120px * 1.5 */
             background-color: rgba(0, 200, 255, 0.5);
             border-radius: 50%;
-            border: 3px solid white;
+            border: 4px solid white; /* Slightly thicker border */
             display: flex;
             justify-content: center;
             align-items: center;
             color: white;
-            font-size: 24px;
+            font-size: 36px; /* 24px * 1.5 */
             font-weight: bold;
             text-shadow: 2px 2px 4px #000;
         }
         .d-pad-btn {
             position: absolute;
-            width: 50px;
-            height: 50px;
+            width: 75px;  /* 50px * 1.5 */
+            height: 75px; /* 50px * 1.5 */
             background-color: rgba(255, 255, 255, 0.5);
-            border: 2px solid white;
+            border: 3px solid white; /* Slightly thicker border */
         }
         .d-pad-btn::after {
             content: '';
@@ -107,14 +109,20 @@
             height: 0;
             border-style: solid;
         }
-        #up { top: 0; left: 50px; }
-        #up::after { border-width: 0 10px 15px 10px; border-color: transparent transparent white transparent; }
-        #down { bottom: 0; left: 50px; }
-        #down::after { border-width: 15px 10px 0 10px; border-color: white transparent transparent transparent; }
-        #left { top: 50px; left: 0; }
-        #left::after { border-width: 10px 15px 10px 0; border-color: transparent white transparent transparent; }
-        #right { top: 50px; right: 0; }
-        #right::after { border-width: 10px 0 10px 15px; border-color: transparent transparent transparent white; }
+        /* FIX: Recalculated positions for proper spacing.
+           The center offset is (container_size - button_size) / 2 = (225 - 75) / 2 = 75px */
+        #up { top: 0; left: 75px; }
+        #down { bottom: 0; left: 75px; }
+        #left { top: 75px; left: 0; }
+        #right { top: 75px; right: 0; }
+
+        /* FIX: Scaled up the triangle sizes */
+        #up::after { border-width: 0 15px 22px 15px; border-color: transparent transparent white transparent; }
+        #down::after { border-width: 22px 15px 0 15px; border-color: white transparent transparent transparent; }
+        #left::after { border-width: 15px 22px 15px 0; border-color: transparent white transparent transparent; }
+        #right::after { border-width: 15px 0 15px 22px; border-color: transparent transparent transparent white; }
+        /* --- END OF TOUCH CONTROL FIXES --- */
+
     </style>
 </head>
 <body>
@@ -159,11 +167,10 @@
         const BGM_VOLUME = 0.3;
         const SHOOT_SOUND_VOLUME = 0.7;
 
-        // --- NEW: Water effect constants ported from the other game ---
         const WATER_PARTICLE_SPEED = 20;
         const WATER_PARTICLE_SIZE = 10;
-        const PARTICLES_PER_FRAME_WHILE_SHOOTING = 12; // Adjusted for balance
-        const SHOT_SPREAD = 40; // How wide the water spray is
+        const PARTICLES_PER_FRAME_WHILE_SHOOTING = 12;
+        const SHOT_SPREAD = 40;
 
         const player = {
             width: PLAYER_BASE_SIZE * TRUCK_SCALE_FACTOR,
@@ -258,52 +265,19 @@
             }
         }
 
-        // --- NEW: shootWater function with ported effects ---
         function shootWater() {
             let nozzleX, nozzleY;
-
-            // Determine nozzle position based on truck direction
             switch(player.direction) {
-                case 'up':
-                    nozzleX = player.x + player.width / 2;
-                    nozzleY = player.y;
-                    break;
-                case 'down':
-                    nozzleX = player.x + player.width / 2;
-                    nozzleY = player.y + player.height;
-                    break;
-                case 'left':
-                    nozzleX = player.x;
-                    nozzleY = player.y + player.height / 2;
-                    break;
-                case 'right':
-                    nozzleX = player.x + player.width;
-                    nozzleY = player.y + player.height / 2;
-                    break;
+                case 'up': nozzleX = player.x + player.width / 2; nozzleY = player.y; break;
+                case 'down': nozzleX = player.x + player.width / 2; nozzleY = player.y + player.height; break;
+                case 'left': nozzleX = player.x; nozzleY = player.y + player.height / 2; break;
+                case 'right': nozzleX = player.x + player.width; nozzleY = player.y + player.height / 2; break;
             }
-
             for (let i = 0; i < PARTICLES_PER_FRAME_WHILE_SHOOTING; i++) {
-                let pX = nozzleX;
-                let pY = nozzleY;
-
-                // Apply spread based on direction
-                if (player.direction === 'up' || player.direction === 'down') {
-                    // Shooting vertically, spread horizontally
-                    pX += (Math.random() - 0.5) * SHOT_SPREAD;
-                } else {
-                    // Shooting horizontally, spread vertically
-                    pY += (Math.random() - 0.5) * SHOT_SPREAD;
-                }
-
-                waterParticles.push({
-                    x: pX,
-                    y: pY,
-                    width: WATER_PARTICLE_SIZE,
-                    height: WATER_PARTICLE_SIZE,
-                    speed: WATER_PARTICLE_SPEED,
-                    life: 40, // How long particles last
-                    direction: player.direction
-                });
+                let pX = nozzleX, pY = nozzleY;
+                if (player.direction === 'up' || player.direction === 'down') { pX += (Math.random() - 0.5) * SHOT_SPREAD; } 
+                else { pY += (Math.random() - 0.5) * SHOT_SPREAD; }
+                waterParticles.push({ x: pX, y: pY, width: WATER_PARTICLE_SIZE, height: WATER_PARTICLE_SIZE, speed: WATER_PARTICLE_SPEED, life: 40, direction: player.direction });
             }
         }
 
@@ -338,27 +312,22 @@
             }
 
             if (keys[' ']) {
-                shootWater(); // Use the new function
+                shootWater();
                 if (shootSound.paused) { shootSound.play().catch(e => {}); }
             } else {
                 if (!shootSound.paused) { shootSound.pause(); shootSound.currentTime = 0; }
             }
 
-            // Update water particles based on their individual properties
             for (let i = waterParticles.length - 1; i >= 0; i--) {
                 const p = waterParticles[i];
                 p.life--;
-
                 switch(p.direction) {
                     case 'up': p.y -= p.speed; break;
                     case 'down': p.y += p.speed; break;
                     case 'left': p.x -= p.speed; break;
                     case 'right': p.x += p.speed; break;
                 }
-
-                if (p.life <= 0) {
-                    waterParticles.splice(i, 1);
-                }
+                if (p.life <= 0) { waterParticles.splice(i, 1); }
             }
             
             const burningHouse = houses.find(h => h.isOnFire);
@@ -421,7 +390,6 @@
             }
             ctx.drawImage(truckImage, player.x, player.y, player.width, player.height);
             
-            // Draw water particles
             ctx.fillStyle = 'rgb(0,200,200)';
             for (const p of waterParticles) {
                 ctx.fillRect(p.x, p.y, p.width, p.height);
